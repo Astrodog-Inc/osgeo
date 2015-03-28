@@ -31,14 +31,13 @@ require 'fileutils'
 #### Configuration Parameters ####
 sslenforce = 0 # Check SSL Certificates?
 testsrc = 1 # Check to see if the source is actually JIRA
+testdst = 1
 debug = 1 # Enable Debugging
 minticket = 1
 maxticket = 2058
 fullcollect = 0 # Delete Destination Directory Before Collecting?
 srcjira = 'https://jira.codehaus.org/'
-destjira = 'localdir' # 'localdir' saves data locally. A JIRA URL saves the data locally then uploads it to the destination instance.
 srcprefix = 'UDIG'
-destprefix = 'UDIG'
 destdir = '/hv02.work/Clients/OSGeo/geoserver_jira' # Local Directory for JIRA Data
 maxretries = 3
 haltonfail = 0 # Halt on any failed ticket / HTTP transaction?
@@ -70,21 +69,23 @@ else
 end
 Dir.chdir(destdir)
 
-agent = Mechanize.new()
+srcagent = Mechanize.new()
+dstagent = Mechanize.new()
 if sslenforce == 0
   if debug > 0
     puts "SSL Enforcement Disabled. Continuing."
   end
-  agent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+  srcagent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+  dstagent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 end
 
-# Connect to Source JIRA. Make sure it's actually JIRA and has our project.
+# Connect to JIRA. Make sure it's actually JIRA and has our project.
 
 if testsrc == 1
   if debug > 0
     puts "Testing " + srcjira + " to see if it's JIRA. Continuing."
   end
-  page =  agent.get(srcjira).body
+  page =  srcagent.get(srcjira).body
   pagedoc = Nokogiri::HTML(page)
   begin
     appname =  pagedoc.xpath("//meta[@name='application-name']").attribute('content')
@@ -106,7 +107,7 @@ if testsrc == 1
 
   # If we've made it this far, it's JIRA. Make sure the srcprefix is valid
   begin
-    agent.get(srcjira + 'browse/' + srcprefix)
+    srcagent.get(srcjira + 'browse/' + srcprefix)
   rescue
     if debug > 0
       puts srcprefix + " doesn't lead to a JIRA project. Exiting."
@@ -136,8 +137,9 @@ while i <= maxticket
     end
     begin
       puts 'Fetching ' + fetchurl + ' . Continuting'
-      ticketxml = agent.get(fetchurl)
+      ticketxml = srcagent.get(fetchurl)
       ticketxml.save_as(jiraticket)
+   
     rescue
       if debug > 0; puts 'Collecting ticket at ' + fetchurl + ' failed. Continuing.' end
       if j <= maxretries
@@ -155,6 +157,19 @@ while i <= maxticket
         next
       end
     end
+    ticketparse = Nokogiri::XML(File.open(jiraticket))
+    ticketparse.xpath("//attachment").each do |node|
+      begin
+        attachfile = node.attributes['name']
+        attachid = node.attributes['id']
+        attachment = attachid.to_s + '/' + attachfile.to_s
+        attachurl = srcjira + 'secure/attachment/' + attachment
+        srcagent.get(attachurl).save_as(ticketid + '/' + attachfile)
+      rescue
+        next
+      end
+    end
+#    srcagent.get(srcjira + 'secure/attachment/' + 67467 + '/' + green.png)
     i = i + 1
 end
 
