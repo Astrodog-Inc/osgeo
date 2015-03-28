@@ -31,13 +31,12 @@ require 'fileutils'
 #### Configuration Parameters ####
 sslenforce = 0 # Check SSL Certificates?
 testsrc = 1 # Check to see if the source is actually JIRA
-testdst = 1
 debug = 1 # Enable Debugging
 minticket = 1
-maxticket = 2058
+maxticket = 248
 fullcollect = 0 # Delete Destination Directory Before Collecting?
 srcjira = 'https://jira.codehaus.org/'
-srcprefix = 'UDIG'
+srcprefix = 'GEO'
 destdir = '/hv02.work/Clients/OSGeo/geoserver_jira' # Local Directory for JIRA Data
 maxretries = 3
 haltonfail = 0 # Halt on any failed ticket / HTTP transaction?

@@ -28,5 +28,74 @@ require 'mechanize'
 require 'nokogiri'
 require 'fileutils'
 
+Project = Struct.new(:name, :minticket, :maxticket, :projectid)
+projects = Array.new()
+
 #### Configuration Parameters ####
-localdir = '/hv02.work/Clients/osgeo'
+localdir = '/hv02.work/Clients/OSGeo/jiradata/'
+projects.push(Project.new("GEOS", 1, 6955, 10000))
+dstjira = 'https://osgeo-org.atlassian.net'
+sslenforce = 0
+testdst = 1
+debug = 1
+
+dstagent = Mechanize.new()
+
+if sslenforce == 0
+  if debug > 0
+    puts "SSL Enforcement Disabled. Continuing."
+  end
+  dstagent.agent.http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+end
+
+if testdst == 1
+  if debug > 0
+    puts "Testing " + dstjira + " to see if it's JIRA. Continuing."
+  end
+  page =  dstagent.get(dstjira).body
+  pagedoc = Nokogiri::HTML(page)
+  begin
+    appname =  pagedoc.xpath("//meta[@name='application-name']").attribute('content')
+    if appname.to_s != 'JIRA'
+      if debug > 0
+        puts "This doesn't look like JIRA. Exiting."
+      end
+      abort
+    end
+  rescue
+    if debug > 0
+      puts "This doesn't look like JIRA. Exiting."
+    end
+    abort
+  end
+  if debug > 0
+    puts "It *is* JIRA. Continuing."
+  end
+end
+
+Dir.chdir(localdir)
+
+# Log in to JIRA
+
+page = dstagent.get(dstjira + '/login')
+loginform = page.form_with(:id => 'form-crowd-login')
+loginform.username = 'harrison.grundy'
+loginform.password = 
+
+
+projects.each do |project|
+  i = project["minticket"]
+  Dir.chdir(localdir + project["name"])
+  while i <= project["maxticket"]
+    page = dstagent.get(dstjira + '/secure/CreateIssue.jspa')
+    firstform = page.form_with(:action => 'CreateIssue.jspa')
+    firstform.project = project["projectid"]
+    firstform.issuetype = 1
+    page = firstform.submit
+    secondform = page.form_with(:action => 'CreateIssueDetails.jspa')
+    secondform.summary = project["projectid"]
+    page = secondform.submit
+    
+    
+  end
+end
